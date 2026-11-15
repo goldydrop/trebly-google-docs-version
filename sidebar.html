@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trelby - Editor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Inter:wght@400;500;600&display=swap');
+
+        :root {
+            --ui-font: 'Inter', system-ui, -apple-system, sans-serif;
+            --script-font: 'Courier Prime', Courier, monospace;
+            --page-height: 1056px; /* 11 inches at 96dpi */
+        }
+
+        body {
+            font-family: var(--ui-font);
+            overflow: hidden;
+            background-color: #f0f0f0;
+        }
+
+        .menu-bar {
+            background-color: #f3f4f6;
+            border-bottom: 1px solid #d1d5db;
+            position: relative;
+        }
+        
+        .menu-item-wrapper {
+            position: relative;
+        }
+
+        .menu-item {
+            padding: 2px 10px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .menu-item:hover, .menu-item.open {
+            background-color: #e5e7eb;
+        }
+
+        /* Classic Desktop Top-Bar Dropdown Menu */
+        .top-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            z-index: 10000;
+            background: #ffffff;
+            border: 1px solid #bdbdbd;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.16);
+            min-width: 205px;
+            padding: 4px 0;
+            font-size: 12px;
+            display: none;
+            user-select: none;
+        }
+
+        .top-dropdown.show {
+            display: block;
+        }
+
+        .top-dropdown-item {
+            padding: 5px 12px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #1f2937;
+        }
+
+        .top-dropdown-item:hover {
+            background-color: #2563eb;
+            color: #ffffff;
+        }
+
+        .top-dropdown-item:hover .drop-shortcut {
+            color: #dbeafe;
+        }
+
+        .drop-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .drop-check {
+            width: 12px;
+            display: inline-block;
+            font-weight: bold;
+        }
+
+        .drop-shortcut {
+            font-size: 11px;
+            color: #9ca3af;
+            margin-left: 16px;
+        }
+
+        .drop-divider {
+            height: 1px;
+            background-color: #e5e7eb;
+            margin: 4px 0;
+        }
+
+        /* Fullscreen Mode Fallback Class */
+        body.is-fullscreen {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 99999;
+        }
+
+        .tab-bar {
+            background-color: #e2e2e2;
+            border-bottom: 1px solid #d1d5db;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            height: 32px;
+            font-size: 12px;
+        }
+
+        .active-tab {
+            position: relative;
+            background: #fcfcfc;
+            padding: 4px 10px;
+            margin-left: 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: 13px;
+            z-index: 10;
+            border-top: 1px solid #a0a0a0;
+            height: 26px;
+        }
+
+        .active-tab::before, .active-tab::after {
+            content: '';
+            position: absolute;
+            top: -1px;
+            bottom: 0;
+            width: 15px;
+            background: #fcfcfc;
+            z-index: -1;
+        }
+
+        .active-tab::before {
+            left: -8px;
+            transform: skewX(-20deg);
+            border-left: 1px solid #a0a0a0;
+            border-top: 1px solid #a0a0a0;
+            border-radius: 3px 0 0 0;
+        }
+
+        .active-tab::after {
+            right: -8px;
+            transform: skewX(20deg);
+            border-right: 1px solid #a0a0a0;
+            border-top: 1px solid #a0a0a0;
+            border-radius: 0 3px 0 0;
+        }
+
+        .close-btn {
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 14px;
+            color: #333;
+            padding: 0 4px;
+            border-radius: 3px;
+        }
+
+        .close-btn:hover {
+            background-color: #e5e7eb;
+        }
+
+        .close-btn.unsaved {
+            color: #d97706;
+            cursor: not-allowed;
+        }
+
+        .status-right {
+            display: flex;
+            align-items: center;
+            height: 100%;
+            color: #333;
+        }
+
+        .status-box {
+            padding: 0 15px;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            border-left: 1px solid #ccc;
+        }
+
+        .status-box.stacked {
+            flex-direction: column;
+            justify-content: center;
+            align-items: flex-start;
+            font-size: 11px;
+            line-height: 1.2;
+            padding: 0 10px;
+        }
+
+        .sidebar {
+            background-color: #ffffff;
+            border-right: 1px solid #d1d5db;
+            width: 220px;
+            font-size: 12px;
+        }
+
+        .editor-bg {
+            background-color: #ebebeb;
+            height: 100%;
+            overflow-y: auto;
+            padding: 32px 0 64px 0;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .paper-wrapper {
+            position: relative;
+            width: 816px;
+        }
+
+        .paper {
+            background-color: #ffffff;
+            width: 816px;
+            min-height: 1056px;
+            padding: 1in;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            font-family: var(--script-font);
+            font-size: 16px;
+            line-height: 1.15;
+            color: #000;
+            cursor: text;
+            outline: none;
+            box-sizing: border-box;
+        }
+
+        .page-break-overlay {
+            position: absolute;
+            left: -10px;
+            right: -10px;
+            height: 28px;
+            background-color: #ebebeb;
+            box-shadow: inset 0 6px 6px -4px rgba(0, 0, 0, 0.32), inset 0 -2px 4px -2px rgba(0, 0, 0, 0.18);
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 22px;
+            font-family: var(--ui-font);
+            font-size: 11px;
+            font-weight: 600;
+            color: #6b7280;
+            pointer-events: none;
+            user-select: none;
+            z-index: 5;
+        }
+
+        .element {
+            margin-top: 0;
+            margin-bottom: 0;
+            white-space: pre-wrap;
+            min-height: 1.15em;
+        }
+        
+        .element.active-line {
+            background-color: rgba(139, 147, 255, 0.12);
+        }
+
+        .scene {
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+            margin-top: 1rem;
+            font-weight: bold;
+        }
+
+        .action {
+            margin-bottom: 1rem;
+        }
+
+        .character {
+            text-transform: uppercase;
+            margin-left: 37%;
+            margin-top: 1rem;
+        }
+
+        .parenthetical {
+            margin-left: 31%;
+            margin-right: 25%;
+        }
+
+        .dialogue {
+            margin-left: 20%;
+            margin-right: 20%;
+            margin-bottom: 1rem;
+        }
+
+        .transition {
+            text-transform: uppercase;
+            text-align: right;
+            margin-right: 5%;
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Custom Right-Click Context Menu */
+        #context-menu {
+            position: fixed;
+            z-index: 9999;
+            background: #ffffff;
+            border: 1px solid #bdbdbd;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+            border-radius: 4px;
+            padding: 4px 0;
+            min-width: 210px;
+            font-size: 12px;
+            display: none;
+            user-select: none;
+        }
+
+        .ctx-header {
+            padding: 3px 12px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: #6b7280;
+            letter-spacing: 0.04em;
+        }
+
+        .ctx-item {
+            padding: 5px 12px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #1f2937;
+        }
+
+        .ctx-item:hover {
+            background-color: #2563eb;
+            color: #ffffff;
+        }
+
+        .ctx-item:hover .ctx-shortcut {
+            color: #dbeafe;
+        }
+
+        .ctx-shortcut {
+            font-size: 11px;
+            color: #9ca3af;
+            margin-left: 16px;
+        }
+
+        .ctx-divider {
+            height: 1px;
+            background-color: #e5e7eb;
+            margin: 4px 0;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col bg-white">
+
+    <!-- Row 1: Classic Menu Bar -->
+    <div class="menu-bar flex items-center justify-between h-7 select-none bg-white pl-1 pr-3">
+        <div class="flex items-center">
+            <div class="menu-item" onclick="syncNow()" title="Sync Now">File</div>
+            <div class="menu-item" onclick="reloadFromDoc()" title="Reload from Google Doc">Edit</div>
+            
+            <!-- View Dropdown Menu -->
+            <div class="menu-item-wrapper" id="view-menu-wrapper">
+                <div class="menu-item" id="view-menu-btn" onclick="toggleViewDropdown(event)">View</div>
+                <div class="top-dropdown" id="view-dropdown">
+                    <div class="top-dropdown-item" onclick="toggleSidebar(); closeTopMenus();">
+                        <span class="drop-left"><span class="drop-check" id="check-scenelist"></span>Scene List</span>
+                        <span class="drop-shortcut">Sidebar</span>
+                    </div>
+                    <div class="drop-divider"></div>
+                    <div class="top-dropdown-item" onclick="toggleFullscreenMode(); closeTopMenus();">
+                        <span class="drop-left"><span class="drop-check" id="check-fullscreen"></span>Fullscreen Mode</span>
+                        <span class="drop-shortcut">F11</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="menu-item">Script</div>
+            <div class="menu-item">Reports</div>
+            <div class="menu-item">Tools</div>
+            <div class="menu-item">Help</div>
+        </div>
+        <div class="flex items-center gap-3">
+            <span id="close-warning" class="text-xs font-semibold text-amber-600 hidden">Wait — saving changes to Google Doc...</span>
+            <div id="sync-status" class="text-xs text-gray-500 font-medium">Loading from Google Doc...</div>
+        </div>
+    </div>
+
+    <!-- Row 2: Tab & Status Bar -->
+    <div class="tab-bar select-none">
+        <div class="tabs-left">
+            <div class="active-tab">
+                <span id="doc-tab-title">untitled.trelby</span>
+                <span id="unsaved-dot" class="text-amber-600 font-bold hidden" title="Unsaved changes">●</span>
+                <span id="close-tab-btn" class="close-btn" onclick="attemptClose()" title="Close Editor">×</span>
+            </div>
+        </div>
+        
+        <div class="status-right">
+            <div class="status-box font-semibold" id="status-element">Scene</div>
+            <div class="status-box stacked">
+                <div id="hint-enter">Action [Enter]</div>
+                <div id="hint-tab">Action [Tab]</div>
+            </div>
+            <div class="status-box w-32">Page <span id="status-page" class="mx-1">1</span> / Line <span id="status-line" class="ml-1">1</span></div>
+        </div>
+    </div>
+
+    <!-- Main Workspace -->
+    <div class="flex-1 flex overflow-hidden border-t border-gray-300">
+        
+        <!-- Collapsed Sidebar Stub -->
+        <div id="collapsed-sidebar" class="bg-gray-100 border-r border-gray-300 w-5 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-200 select-none text-gray-600 font-bold text-lg" title="Show Scene List">
+            ›
+        </div>
+
+        <!-- Left Sidebar: Scene List -->
+        <div id="sidebar" class="sidebar flex-col select-none" style="display: none;">
+            <div class="bg-gray-100 font-semibold p-1.5 pl-2 border-b border-gray-300 flex justify-between items-center text-xs">
+                <span>Scene List</span>
+                <span id="close-sidebar" class="cursor-pointer px-1.5 hover:bg-gray-300 rounded text-gray-500 text-sm">×</span>
+            </div>
+            <div class="flex-1 overflow-y-auto">
+                <ul id="scene-list-ul" class="p-2 space-y-1"></ul>
+            </div>
+        </div>
+
+        <!-- Main Editor Area -->
+        <div class="editor-bg flex-1" id="editor-container">
+            <div class="paper-wrapper" id="paper-wrapper">
+                <div class="paper" id="script-paper" contenteditable="true" spellcheck="false">
+                    <div class="element scene" data-type="Scene"></div>
+                </div>
+                <div id="page-breaks-layer"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right-Click Context Menu -->
+    <div id="context-menu">
+        <div class="ctx-header">Convert Line / Selection To</div>
+        <div class="ctx-item" onclick="applyContextMode('Scene')"><span>Scene Heading</span><span class="ctx-shortcut">INT./EXT.</span></div>
+        <div class="ctx-item" onclick="applyContextMode('Action')"><span>Action</span><span class="ctx-shortcut">Tab / Enter</span></div>
+        <div class="ctx-item" onclick="applyContextMode('Character')"><span>Character</span><span class="ctx-shortcut">Tab</span></div>
+        <div class="ctx-item" onclick="applyContextMode('Parenthetical')"><span>Parenthetical</span><span class="ctx-shortcut">( ... )</span></div>
+        <div class="ctx-item" onclick="applyContextMode('Dialogue')"><span>Dialogue</span><span class="ctx-shortcut">Enter</span></div>
+        <div class="ctx-item" onclick="applyContextMode('Transition')"><span>Transition</span><span class="ctx-shortcut">CUT TO:</span></div>
+        <div class="ctx-divider"></div>
+        <div class="ctx-header">Insert New Line Below</div>
+        <div class="ctx-item" onclick="insertElementBelow('Action')"><span>New Action Line</span><span class="ctx-shortcut">Enter</span></div>
+        <div class="ctx-item" onclick="insertElementBelow('Character')"><span>New Character + Dialogue</span><span class="ctx-shortcut">Tab</span></div>
+        <div class="ctx-divider"></div>
+        <div class="ctx-item" onclick="syncNow(); hideContextMenu();"><span>Force Sync to Google Doc</span><span class="ctx-shortcut">Save</span></div>
+    </div>
+
+    <script>
+        const ELEMENT_ORDER = ['Scene', 'Action', 'Character', 'Parenthetical', 'Dialogue', 'Transition'];
+        const PAGE_HEIGHT_PX = 1056;   // 11 inches at 96dpi
+        const PAGE_MARGIN_PX = 96;     // 1 inch top/bottom margin
+        const PAGE_GAP_PX = 28;        // Gray gap height between pages
+        const TOTAL_PAGE_STEP = PAGE_HEIGHT_PX + PAGE_GAP_PX;
+        
+        const NEXT_ON_ENTER = {
+            'Scene': 'Action',
+            'Action': 'Action',
+            'Character': 'Dialogue',
+            'Parenthetical': 'Dialogue',
+            'Dialogue': 'Action',
+            'Transition': 'Scene'
+        };
+
+        const NEXT_ON_TAB = {
+            'Scene': 'Action',
+            'Action': 'Character',
+            'Character': 'Parenthetical',
+            'Parenthetical': 'Dialogue',
+            'Dialogue': 'Action',
+            'Transition': 'Scene'
+        };
+
+        const paper = document.getElementById('script-paper');
+        const pageBreaksLayer = document.getElementById('page-breaks-layer');
+        const statusElement = document.getElementById('status-element');
+        const hintEnter = document.getElementById('hint-enter');
+        const hintTab = document.getElementById('hint-tab');
+        const statusLine = document.getElementById('status-line');
+        const statusPage = document.getElementById('status-page');
+        const syncStatus = document.getElementById('sync-status');
+        const sceneListUl = document.getElementById('scene-list-ul');
+        const docTabTitle = document.getElementById('doc-tab-title');
+        const contextMenu = document.getElementById('context-menu');
+        const closeTabBtn = document.getElementById('close-tab-btn');
+        const unsavedDot = document.getElementById('unsaved-dot');
+        const closeWarning = document.getElementById('close-warning');
+        const viewDropdown = document.getElementById('view-dropdown');
+        const viewMenuBtn = document.getElementById('view-menu-btn');
+        const checkFullscreen = document.getElementById('check-fullscreen');
+        const checkScenelist = document.getElementById('check-scenelist');
+
+        let syncTimeout = null;
+        let hasUnsavedChanges = false;
+        let isSyncing = false;
+        let pendingCloseAfterSync = false;
+        let savedSelectionRange = null;
+        let isFullscreenActive = false;
+
+        // Top Bar View Dropdown & Fullscreen Controls
+        function toggleViewDropdown(e) {
+            e.stopPropagation();
+            hideContextMenu();
+            const isOpen = viewDropdown.classList.contains('show');
+            closeTopMenus();
+            if (!isOpen) {
+                viewDropdown.classList.add('show');
+                viewMenuBtn.classList.add('open');
+            }
+        }
+
+        function closeTopMenus() {
+            viewDropdown.classList.remove('show');
+            viewMenuBtn.classList.remove('open');
+        }
+
+        function updateFullscreenCheck() {
+            const nativeFs = !!document.fullscreenElement;
+            const active = nativeFs || isFullscreenActive;
+            checkFullscreen.textContent = active ? '✓' : '';
+            document.body.classList.toggle('is-fullscreen', active);
+        }
+
+        async function toggleFullscreenMode() {
+            try {
+                if (!document.fullscreenElement && !isFullscreenActive) {
+                    if (document.documentElement.requestFullscreen) {
+                        await document.documentElement.requestFullscreen();
+                    }
+                    isFullscreenActive = true;
+                } else {
+                    if (document.fullscreenElement && document.exitFullscreen) {
+                        await document.exitFullscreen();
+                    }
+                    isFullscreenActive = false;
+                }
+            } catch (err) {
+                // Fallback if iframe permissions block native fullscreen API
+                isFullscreenActive = !isFullscreenActive;
+            }
+            updateFullscreenCheck();
+        }
+
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) {
+                isFullscreenActive = false;
+            }
+            updateFullscreenCheck();
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'F11') {
+                e.preventDefault();
+                toggleFullscreenMode();
+            }
+        });
+
+        function setDirtyState(dirty) {
+            hasUnsavedChanges = dirty;
+            if (dirty || isSyncing) {
+                unsavedDot.classList.remove('hidden');
+                closeTabBtn.classList.add('unsaved');
+                closeTabBtn.title = 'Cannot close until changes are saved to Google Doc';
+            } else {
+                unsavedDot.classList.add('hidden');
+                closeTabBtn.classList.remove('unsaved');
+                closeWarning.classList.add('hidden');
+                closeTabBtn.title = 'Close Editor';
+            }
+        }
+
+        function attemptClose() {
+            if (hasUnsavedChanges || isSyncing) {
+                pendingCloseAfterSync = true;
+                closeWarning.classList.remove('hidden');
+                clearTimeout(syncTimeout);
+                if (!isSyncing) {
+                    syncNow();
+                }
+                return;
+            }
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.host.close();
+            }
+        }
+
+        window.addEventListener('beforeunload', (e) => {
+            if (hasUnsavedChanges || isSyncing) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+
+        function updatePagination() {
+            const elements = Array.from(paper.querySelectorAll('.element'));
+
+            elements.forEach(el => {
+                el.style.marginTop = '';
+                el.removeAttribute('data-page-start');
+            });
+
+            let currentPage = 1;
+
+            elements.forEach(el => {
+                const pageStartTop = (currentPage - 1) * TOTAL_PAGE_STEP;
+                const bottomContentLimit = pageStartTop + PAGE_HEIGHT_PX - PAGE_MARGIN_PX;
+                const elTop = el.offsetTop;
+                const elBottom = elTop + el.offsetHeight;
+
+                if (elBottom > bottomContentLimit && elTop > pageStartTop + PAGE_MARGIN_PX + 20) {
+                    currentPage++;
+                    const nextPageTextStart = (currentPage - 1) * TOTAL_PAGE_STEP + PAGE_MARGIN_PX;
+                    const computedMarginTop = parseFloat(window.getComputedStyle(el).marginTop) || 0;
+                    const pushDown = Math.max(0, nextPageTextStart - elTop + computedMarginTop);
+                    el.style.marginTop = pushDown + 'px';
+                    el.setAttribute('data-page-start', currentPage);
+                }
+            });
+
+            const totalPages = currentPage;
+            const totalHeight = totalPages * PAGE_HEIGHT_PX + (totalPages - 1) * PAGE_GAP_PX;
+            paper.style.minHeight = totalHeight + 'px';
+
+            pageBreaksLayer.innerHTML = '';
+            for (let p = 1; p < totalPages; p++) {
+                const breakDiv = document.createElement('div');
+                breakDiv.className = 'page-break-overlay';
+                breakDiv.style.top = (p * PAGE_HEIGHT_PX + (p - 1) * PAGE_GAP_PX) + 'px';
+                breakDiv.textContent = `Page ${p + 1}`;
+                pageBreaksLayer.appendChild(breakDiv);
+            }
+        }
+
+        function getCurrentElement() {
+            const sel = window.getSelection();
+            if (!sel || sel.rangeCount === 0) return paper.querySelector('.element');
+            let node = sel.anchorNode;
+            while (node && node !== paper) {
+                if (node.nodeType === Node.ELEMENT_NODE && node.classList.contains('element')) {
+                    return node;
+                }
+                node = node.parentNode;
+            }
+            return paper.querySelector('.element');
+        }
+
+        function setCaretToElement(el, atEnd = false) {
+            if (!el) return;
+            const range = document.createRange();
+            const sel = window.getSelection();
+            if (el.childNodes.length === 0) {
+                el.appendChild(document.createTextNode(''));
+            }
+            range.selectNodeContents(el);
+            range.collapse(!atEnd);
+            sel.removeAllRanges();
+            sel.addRange(range);
+            updateStatusBar(el);
+        }
+
+        function setElementType(el, type) {
+            if (!el) return;
+            el.setAttribute('data-type', type);
+            el.className = 'element ' + type.toLowerCase();
+            refreshSceneList();
+            updatePagination();
+            updateStatusBar(el);
+            scheduleSync();
+        }
+
+        function updateStatusBar(el) {
+            if (!el) return;
+            paper.querySelectorAll('.element.active-line').forEach(node => {
+                if (node !== el) node.classList.remove('active-line');
+            });
+            el.classList.add('active-line');
+
+            const type = el.getAttribute('data-type') || 'Action';
+            statusElement.textContent = type;
+            hintEnter.textContent = `${NEXT_ON_ENTER[type]} [Enter]`;
+            hintTab.textContent = `${NEXT_ON_TAB[type]} [Tab]`;
+
+            const all = Array.from(paper.querySelectorAll('.element'));
+            statusLine.textContent = all.indexOf(el) + 1;
+
+            const pageNum = Math.max(1, Math.floor(el.offsetTop / TOTAL_PAGE_STEP) + 1);
+            statusPage.textContent = pageNum;
+        }
+
+        function createNewElement(type, text = '') {
+            const div = document.createElement('div');
+            div.textContent = text;
+            div.setAttribute('data-type', type);
+            div.className = 'element ' + type.toLowerCase();
+            return div;
+        }
+
+        function insertElementBelow(type) {
+            hideContextMenu();
+            restoreSavedSelection();
+            const target = getCurrentElement() || paper.lastElementChild;
+            const newEl = createNewElement(type, '');
+            if (target) {
+                target.insertAdjacentElement('afterend', newEl);
+            } else {
+                paper.appendChild(newEl);
+            }
+            paper.focus();
+            updatePagination();
+            setCaretToElement(newEl, false);
+            scheduleSync();
+        }
+
+        function refreshSceneList() {
+            sceneListUl.innerHTML = '';
+            const scenes = paper.querySelectorAll('.element.scene');
+            scenes.forEach((sceneEl, idx) => {
+                const li = document.createElement('li');
+                li.className = 'p-1 hover:bg-blue-100 cursor-pointer rounded truncate text-gray-800';
+                li.textContent = sceneEl.textContent.trim() || `Scene ${idx + 1}`;
+                li.onclick = () => {
+                    sceneEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    setCaretToElement(sceneEl, true);
+                };
+                sceneListUl.appendChild(li);
+            });
+        }
+
+        function normalizePaperChildren() {
+            Array.from(paper.childNodes).forEach(node => {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    if (node.textContent.trim() !== '') {
+                        const div = createNewElement('Action', node.textContent);
+                        paper.replaceChild(div, node);
+                    } else {
+                        node.remove();
+                    }
+                } else if (node.nodeType === Node.ELEMENT_NODE && !node.classList.contains('element')) {
+                    const div = createNewElement('Action', node.textContent);
+                    paper.replaceChild(div, node);
+                }
+            });
+            if (paper.querySelectorAll('.element').length === 0) {
+                const first = createNewElement('Scene', '');
+                paper.appendChild(first);
+                setCaretToElement(first);
+            }
+        }
+
+        function handleSelectionTransform(selection, target, targetNextType) {
+            const range = selection.getRangeAt(0);
+            const allElements = Array.from(paper.querySelectorAll('.element'));
+            const touchedElements = allElements.filter(el => selection.containsNode(el, true));
+
+            if (touchedElements.length === 1) {
+                const el = touchedElements[0];
+                const fullText = el.textContent;
+                const selectedText = selection.toString();
+
+                if (selectedText.trim().length > 0 && selectedText.trim().length < fullText.trim().length) {
+                    const preRange = document.createRange();
+                    preRange.selectNodeContents(el);
+                    preRange.setEnd(range.startContainer, range.startOffset);
+                    const beforeText = preRange.toString().trim();
+
+                    const postRange = document.createRange();
+                    postRange.selectNodeContents(el);
+                    postRange.setStart(range.endContainer, range.endOffset);
+                    const afterText = postRange.toString().trim();
+
+                    const currentType = el.getAttribute('data-type') || 'Action';
+                    const newEl = createNewElement(targetNextType, selectedText.trim());
+
+                    if (beforeText && afterText) {
+                        el.textContent = beforeText;
+                        const afterEl = createNewElement(currentType, afterText);
+                        el.insertAdjacentElement('afterend', newEl);
+                        newEl.insertAdjacentElement('afterend', afterEl);
+                    } else if (beforeText) {
+                        el.textContent = beforeText;
+                        el.insertAdjacentElement('afterend', newEl);
+                    } else if (afterText) {
+                        el.textContent = afterText;
+                        el.insertAdjacentElement('beforebegin', newEl);
+                    }
+
+                    refreshSceneList();
+                    updatePagination();
+                    setCaretToElement(newEl, true);
+                    scheduleSync();
+                    return;
+                }
+            }
+
+            touchedElements.forEach(el => setElementType(el, targetNextType));
+        }
+
+        paper.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            closeTopMenus();
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount > 0) {
+                savedSelectionRange = sel.getRangeAt(0).cloneRange();
+            }
+
+            const menuWidth = 220;
+            const menuHeight = 310;
+            const x = Math.min(e.clientX, window.innerWidth - menuWidth - 10);
+            const y = Math.min(e.clientY, window.innerHeight - menuHeight - 10);
+
+            contextMenu.style.left = x + 'px';
+            contextMenu.style.top = y + 'px';
+            contextMenu.style.display = 'block';
+        });
+
+        function hideContextMenu() {
+            contextMenu.style.display = 'none';
+        }
+
+        function restoreSavedSelection() {
+            if (savedSelectionRange) {
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(savedSelectionRange);
+            }
+        }
+
+        function applyContextMode(mode) {
+            hideContextMenu();
+            paper.focus();
+            restoreSavedSelection();
+
+            const sel = window.getSelection();
+            const target = getCurrentElement();
+            const hasSelection = sel && !sel.isCollapsed && sel.toString().trim().length > 0;
+
+            if (hasSelection) {
+                handleSelectionTransform(sel, target, mode);
+            } else if (target) {
+                setElementType(target, mode);
+            }
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!contextMenu.contains(e.target)) {
+                hideContextMenu();
+            }
+            if (!document.getElementById('view-menu-wrapper').contains(e.target)) {
+                closeTopMenus();
+            }
+        });
+
+        paper.addEventListener('keydown', (e) => {
+            hideContextMenu();
+            closeTopMenus();
+            const target = getCurrentElement();
+            if (!target) return;
+
+            const currentType = target.getAttribute('data-type') || 'Action';
+            const selection = window.getSelection();
+            const hasSelection = selection && !selection.isCollapsed && selection.toString().trim().length > 0;
+
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                const nextType = e.shiftKey
+                    ? ELEMENT_ORDER[(ELEMENT_ORDER.indexOf(currentType) - 1 + ELEMENT_ORDER.length) % ELEMENT_ORDER.length]
+                    : NEXT_ON_TAB[currentType];
+
+                if (hasSelection) {
+                    handleSelectionTransform(selection, target, nextType);
+                } else if (target.textContent.trim() === '') {
+                    setElementType(target, nextType);
+                } else {
+                    const newEl = createNewElement(nextType);
+                    target.insertAdjacentElement('afterend', newEl);
+                    updatePagination();
+                    setCaretToElement(newEl);
+                    scheduleSync();
+                }
+            }
+
+            else if (e.key === 'Enter') {
+                e.preventDefault();
+                const nextType = NEXT_ON_ENTER[currentType];
+
+                if (hasSelection) {
+                    handleSelectionTransform(selection, target, nextType);
+                    return;
+                }
+
+                if (target.textContent.trim() === '' && currentType !== 'Action') {
+                    setElementType(target, NEXT_ON_TAB[currentType]);
+                    return;
+                }
+
+                const range = selection.getRangeAt(0);
+                const postRange = document.createRange();
+                postRange.selectNodeContents(target);
+                postRange.setStart(range.endContainer, range.endOffset);
+                const trailingText = postRange.toString();
+                postRange.deleteContents();
+
+                const newEl = createNewElement(nextType, trailingText);
+                target.insertAdjacentElement('afterend', newEl);
+                refreshSceneList();
+                updatePagination();
+                setCaretToElement(newEl, false);
+                scheduleSync();
+            }
+        });
+
+        document.addEventListener('selectionchange', () => {
+            if (document.activeElement === paper || paper.contains(document.activeElement)) {
+                const currentEl = getCurrentElement();
+                if (currentEl) updateStatusBar(currentEl);
+            }
+        });
+
+        paper.addEventListener('input', () => {
+            normalizePaperChildren();
+            refreshSceneList();
+            updatePagination();
+            const currentEl = getCurrentElement();
+            if (currentEl) updateStatusBar(currentEl);
+            scheduleSync();
+        });
+
+        function scheduleSync() {
+            setDirtyState(true);
+            syncStatus.textContent = 'Unsaved changes...';
+            clearTimeout(syncTimeout);
+            syncTimeout = setTimeout(syncNow, 1000);
+        }
+
+        function syncNow() {
+            clearTimeout(syncTimeout);
+            isSyncing = true;
+            setDirtyState(true);
+            syncStatus.textContent = 'Syncing to Doc...';
+
+            const elementsData = Array.from(paper.querySelectorAll('.element')).map(el => ({
+                type: el.getAttribute('data-type') || 'Action',
+                text: el.textContent
+            }));
+
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run
+                    .withSuccessHandler(() => {
+                        isSyncing = false;
+                        setDirtyState(false);
+                        syncStatus.textContent = 'Synced to Google Doc';
+
+                        if (pendingCloseAfterSync) {
+                            pendingCloseAfterSync = false;
+                            google.script.host.close();
+                        }
+                    })
+                    .withFailureHandler((err) => {
+                        isSyncing = false;
+                        pendingCloseAfterSync = false;
+                        syncStatus.textContent = 'Sync error: ' + err.message;
+                        console.error(err);
+                    })
+                    .syncFullScript(elementsData);
+            } else {
+                isSyncing = false;
+                setDirtyState(false);
+                syncStatus.textContent = 'Local Preview Mode';
+            }
+        }
+
+        function reloadFromDoc() {
+            syncStatus.textContent = 'Loading from Google Doc...';
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run
+                    .withSuccessHandler((data) => {
+                        if (data && data.title) {
+                            docTabTitle.textContent = data.title + '.trelby';
+                        }
+                        paper.innerHTML = '';
+                        if (data && data.elements && data.elements.length > 0) {
+                            data.elements.forEach(item => {
+                                paper.appendChild(createNewElement(item.type, item.text));
+                            });
+                        } else {
+                            paper.appendChild(createNewElement('Scene', ''));
+                        }
+                        refreshSceneList();
+                        updatePagination();
+                        const firstEl = paper.querySelector('.element');
+                        if (firstEl) {
+                            paper.focus();
+                            setCaretToElement(firstEl, true);
+                        }
+                        isSyncing = false;
+                        setDirtyState(false);
+                        syncStatus.textContent = 'Synced to Google Doc';
+                    })
+                    .withFailureHandler((err) => {
+                        syncStatus.textContent = 'Load error: ' + err.message;
+                    })
+                    .loadScriptFromDoc();
+            } else {
+                syncStatus.textContent = 'Local Preview Mode';
+            }
+        }
+
+        const sidebar = document.getElementById('sidebar');
+        const collapsedSidebar = document.getElementById('collapsed-sidebar');
+        const closeSidebarBtn = document.getElementById('close-sidebar');
+
+        function toggleSidebar() {
+            const isHidden = sidebar.style.display === 'none';
+            sidebar.style.display = isHidden ? 'flex' : 'none';
+            collapsedSidebar.style.display = isHidden ? 'none' : 'flex';
+            checkScenelist.textContent = isHidden ? '✓' : '';
+        }
+
+        collapsedSidebar.addEventListener('click', toggleSidebar);
+        closeSidebarBtn.addEventListener('click', toggleSidebar);
+
+        reloadFromDoc();
+    </script>
+</body>
+</html>
